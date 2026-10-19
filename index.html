@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>t-rex-slider | 左右互搏・多工小恐龍</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #12141c;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* 頂部標頭與狀態欄 */
+    header {
+      width: 95%;
+      max-width: 1080px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e2230;
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: 1px solid #2d3748;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      background: #0284c7;
+      color: #fff;
+      border-radius: 6px;
+      font-weight: normal;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .shield-tag {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      transition: all 0.3s ease;
+    }
+    .shield-active {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      border: 1px solid #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+    }
+    .shield-inactive {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    /* 核心主視窗 (左右分割) */
+    .game-arena {
+      width: 95%;
+      max-width: 1080px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+      position: relative;
+    }
+    @media (max-width: 820px) {
+      .game-arena {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 左側：跑酷區塊 */
+    .panel {
+      background: #181b26;
+      border-radius: 12px;
+      border: 1px solid #2a3142;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    }
+    .panel-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    #runnerCanvas {
+      background: #202433;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      width: 100%;
+      height: 280px;
+      display: block;
+    }
+    .control-hint {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      gap: 12px;
+    }
+    .key-badge {
+      background: #283044;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #cbd5e1;
+      border: 1px solid #3e4a68;
+    }
+
+    /* 右側：滑塊拼圖區塊 */
+    .puzzle-timer-container {
+      width: 100%;
+      height: 8px;
+      background: #252b3d;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .puzzle-timer-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      transition: width 0.1s linear, background-color 0.3s;
+    }
+    .puzzle-grid {
+      display: grid;
+      gap: 8px;
+      width: 280px;
+      height: 280px;
+      background: #202433;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+    }
+    .puzzle-tile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0f172a;
+      background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
+      transition: transform 0.08s ease, background 0.15s;
+    }
+    .puzzle-tile:hover {
+      transform: scale(0.97);
+      background: linear-gradient(135deg, #c7d2fe, #a5b4fc);
+    }
+    .puzzle-tile.empty {
+      background: transparent;
+      box-shadow: none;
+      cursor: default;
+    }
+
+    /* 遊戲彈窗 (GameOver / Start) */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 12, 18, 0.92);
+      backdrop-filter: blur(5px);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+      text-align: center;
+    }
+    .overlay.hidden {
+      display: none;
+    }
+    .overlay-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #f87171;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .overlay-title.start {
+      color: #38bdf8;
+    }
+    .overlay-sub {
+      color: #94a3b8;
+      font-size: 1rem;
+      margin-bottom: 24px;
+      max-width: 440px;
+      line-height: 1.5;
+    }
+    .record-box {
+      background: #181e2b;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 16px 28px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 32px;
+    }
+    .record-val {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #38bdf8;
+    }
+    .record-label {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .btn-action {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      padding: 12px 36px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+      transition: all 0.2s;
+    }
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+    }
+    .btn-action:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部資訊列 -->
+  <header>
+    <div class="brand-title">
+      🦖 t-rex-slider
+      <span class="badge">Dual-Task</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span>⏱️ 存活:</span>
+        <span id="statTime">00:00</span>
+      </div>
+      <div class="stat-item">
+        <span>🧩 階級:</span>
+        <span id="statLevel">3x3</span>
+      </div>
+      <div class="stat-item">
+        <span id="shieldTag" class="shield-tag shield-inactive">🛡️ 名刀: 無</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 遊戲主體視窗 -->
+  <main class="game-arena">
+    <!-- 左：跑酷區 -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>🏃 左手跑酷區</span>
+        <span id="speedIndicator">速度: 1.0x</span>
+      </div>
+      <canvas id="runnerCanvas" width="600" height="300"></canvas>
+      <div class="control-hint">
+        <span><span class="key-badge">Space</span> / <span class="key-badge">↑</span> 跳躍</span>
+        <span><span class="key-badge">↓</span> 蹲下避鳥</span>
+      </div>
+    </section>
+
+    <!-- 右：拼圖區 -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>🧩 右手滑塊拼圖</span>
+        <span id="timerText">剩餘: 45s</span>
+      </div>
+      <div class="puzzle-timer-container">
+        <div id="puzzleTimerBar" class="puzzle-timer-bar"></div>
+      </div>
+      <div id="puzzleBoard" class="puzzle-grid"></div>
+      <div class="control-hint">
+        <span>🖱️ 滑鼠點擊推動鄰近方塊獲得名刀</span>
+      </div>
+    </section>
+
+    <!-- 彈出視窗 (開始 / 結束) -->
+    <div id="modalOverlay" class="overlay">
+      <h1 id="modalTitle" class="overlay-title start">t-rex-slider</h1>
+      <p id="modalDesc" class="overlay-sub">
+        挑戰你的雙工極限！左手鍵盤閃避障礙（一撞即死），右手滑鼠在時限內解開拼圖，換取保命名刀！
+      </p>
+      <div id="recordGroup" class="record-box" style="display: none;">
+        <div>
+          <div id="finalTime" class="record-val">00:00</div>
+          <div class="record-label">存活時間</div>
+        </div>
+        <div>
+          <div id="finalSolved" class="record-val">0</div>
+          <div class="record-label">拼圖解開次數</div>
+        </div>
+      </div>
+      <button id="btnStart" class="btn-action">開始挑戰</button>
+    </div>
+  </main>
+
+  <script>
+    /* ==========================================================================
+       1. 遊戲全局狀態與變數
+       ========================================================================== */
+    const state = {
+      isRunning: false,
+      startTime: 0,
+      elapsedSeconds: 0,
+      hasShield: false,
+      solvedCount: 0,
+      puzzleSize: 3, // 3 -> 4 -> 5
+      puzzleTimeMax: 45,
+      puzzleTimeRemaining: 45,
+      timerInterval: null,
+      speedMultiplier: 1.0,
+      invincibleUntil: 0 // 破盾後的閃爍無敵毫秒時間戳
+    };
+
+    // DOM 快取
+    const canvas = document.getElementById('runnerCanvas');
+    const ctx = canvas.getContext('2d');
+    const statTime = document.getElementById('statTime');
+    const statLevel = document.getElementById('statLevel');
+    const shieldTag = document.getElementById('shieldTag');
+    const speedIndicator = document.getElementById('speedIndicator');
+    const puzzleBoard = document.getElementById('puzzleBoard');
+    const puzzleTimerBar = document.getElementById('puzzleTimerBar');
+    const timerText = document.getElementById('timerText');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const recordGroup = document.getElementById('recordGroup');
+    const finalTime = document.getElementById('finalTime');
+    const finalSolved = document.getElementById('finalSolved');
+    const btnStart = document.getElementById('btnStart');
+
+    /* ==========================================================================
+       2. 跑酷實體 (純 Canvas 像素繪製，不依賴外部圖片)
+       ========================================================================== */
+    const GROUND_Y = 250;
+    const dino = {
+      x: 50,
+      y: GROUND_Y,
+      width: 44,
+      height: 48,
+      vy: 0,
+      gravity: 0.75,
+      jumpForce: -13.5,
+      isGrounded: true,
+      isDucking: false,
+      stepCount: 0
+    };
+
+    let obstacles = [];
+    let clouds = [];
+    let lastSpawnTime = 0;
+
+    // 鍵盤監聽 (防止網頁捲動)
+    const keys = { Jump: false, Duck: false };
+    window.addEventListener('keydown', (e) => {
+      if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
+        e.preventDefault();
+      }
+      if (!state.isRunning) return;
+      if (e.code === 'Space' || e.code === 'ArrowUp') keys.Jump = true;
+      if (e.code === 'ArrowDown') keys.Duck = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') keys.Jump = false;
+      if (e.code === 'ArrowDown') keys.Duck = false;
+    });
+
+    // 小恐龍繪製 (純代碼像素風)
+    function drawDino(ctx, x, y, isDucking, step, hasShield, isInvincible) {
+      ctx.save();
+      if (isInvincible && Math.floor(Date.now() / 100) % 2 === 0) {
+        ctx.globalAlpha = 0.3; // 受傷無敵閃爍
+      }
+
+      // 護盾光環效果
+      if (hasShield) {
+        ctx.strokeStyle = '#4ade80';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const radius = isDucking ? 28 : 34;
+        const cy = isDucking ? y - 16 : y - 24;
+        ctx.arc(x + 22, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#cbd5e1';
+
+      if (isDucking) {
+        // 蹲下身軀 (低扁寬)
+        ctx.fillRect(x, y - 24, 56, 20);
+        ctx.fillRect(x + 40, y - 26, 18, 14); // 頭
+        ctx.fillStyle = '#1e2230';
+        ctx.fillRect(x + 50, y - 24, 4, 4); // 眼睛
+        ctx.fillStyle = '#cbd5e1';
+        // 腳步
+        if (step % 2 === 0) {
+          ctx.fillRect(x + 12, y - 4, 8, 4);
+        } else {
+          ctx.fillRect(x + 36, y - 4, 8, 4);
+        }
+      } else {
+        // 站立/跑步狀態
+        // 身體與頭部
+        ctx.fillRect(x + 10, y - 40, 24, 28);
+        ctx.fillRect(x + 22, y - 48, 22, 18); // 頭
+        ctx.fillRect(x + 14, y - 46, 12, 10); // 脖子
+        ctx.fillRect(x, y - 26, 12, 12);      // 尾巴
+        ctx.fillRect(x + 30, y - 24, 10, 4);  // 手
+        // 眼睛
+        ctx.fillStyle = '#1e2230';
+        ctx.fillRect(x + 36, y - 44, 4, 4);
+        ctx.fillStyle = '#cbd5e1';
+        // 跑步交替雙腳
+        if (dino.isGrounded) {
+          if (step % 2 === 0) {
+            ctx.fillRect(x + 16, y - 12, 4, 12);
+            ctx.fillRect(x + 28, y - 6, 4, 6);
+          } else {
+            ctx.fillRect(x + 16, y - 6, 4, 6);
+            ctx.fillRect(x + 28, y - 12, 4, 12);
+          }
+        } else {
+          // 跳躍浮空腳姿
+          ctx.fillRect(x + 16, y - 8, 6, 8);
+          ctx.fillRect(x + 26, y - 8, 6, 8);
+        }
+      }
+      ctx.restore();
+    }
+
+    // 仙人掌繪製
+    function drawCactus(ctx, x, y, width, height) {
+      ctx.save();
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(x + width * 0.35, y - height, width * 0.3, height);
+      // 左右分枝
+      ctx.fillRect(x, y - height * 0.7, width * 0.35, height * 0.2);
+      ctx.fillRect(x, y - height * 0.75, width * 0.15, height * 0.35);
+      ctx.fillRect(x + width * 0.65, y - height * 0.55, width * 0.35, height * 0.2);
+      ctx.fillRect(x + width * 0.85, y - height * 0.65, width * 0.15, height * 0.35);
+      ctx.restore();
+    }
+
+    // 翼龍繪製 (需要蹲下或看高度跳躍)
+    function drawBird(ctx, x, y, flap) {
+      ctx.save();
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(x, y - 10, 32, 12); // 身
+      ctx.fillRect(x - 8, y - 12, 10, 8); // 嘴
+      if (flap % 2 === 0) {
+        // 翅膀朝上
+        ctx.fillRect(x + 10, y - 24, 12, 14);
+      } else {
+        // 翅膀朝下
+        ctx.fillRect(x + 10, y + 2, 12, 14);
+      }
+      ctx.restore();
+    }
+
+    // 地面繪製
+    let groundOffset = 0;
+    function drawGround(ctx, speed) {
+      ctx.save();
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, GROUND_Y);
+      ctx.lineTo(canvas.width, GROUND_Y);
+      ctx.stroke();
+
+      groundOffset = (groundOffset + speed) % 40;
+      ctx.fillStyle = '#64748b';
+      for (let i = -groundOffset; i < canvas.width; i += 40) {
+        ctx.fillRect(i, GROUND_Y + 4, 12, 2);
+        ctx.fillRect(i + 20, GROUND_Y + 10, 6, 2);
+      }
+      ctx.restore();
+    }
+
+    // 碰撞偵測 AABB
+    function checkCollision(r1, r2) {
+      return (
+        r1.x < r2.x + r2.w &&
+        r1.x + r1.w > r2.x &&
+        r1.y - r1.h < r2.y &&
+        r1.y > r2.y - r2.h
+      );
+    }
+
+    /* ==========================================================================
+       3. 右側滑塊拼圖系統 (保證 100% 有解隨機打亂)
+       ========================================================================== */
+    let puzzleTiles = [];
+    let emptyIdx = 0;
+
+    function initPuzzle(size) {
+      state.puzzleSize = size;
+      statLevel.textContent = `${size}x${size}`;
+      puzzleBoard.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      puzzleBoard.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+
+      // 重設拼圖時限 (尺寸越大時限越寬)
+      state.puzzleTimeMax = size === 3 ? 45 : (size === 4 ? 75 : 110);
+      state.puzzleTimeRemaining = state.puzzleTimeMax;
+      updateTimerUI();
+
+      // 目標狀態 [1, 2, 3, ..., null]
+      const total = size * size;
+      puzzleTiles = [];
+      for (let i = 1; i < total; i++) puzzleTiles.push(i);
+      puzzleTiles.push(null);
+      emptyIdx = total - 1;
+
+      // 藉由從解開狀態隨機滑動 100 次來打亂，嚴格確保絕對有解
+      for (let step = 0; step < 120; step++) {
+        const neighbors = getValidMoves(emptyIdx, size);
+        const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+        // 交換
+        puzzleTiles[emptyIdx] = puzzleTiles[randomNeighbor];
+        puzzleTiles[randomNeighbor] = null;
+        emptyIdx = randomNeighbor;
+      }
+
+      renderPuzzleBoard();
+    }
+
+    function getValidMoves(empty, size) {
+      const moves = [];
+      const row = Math.floor(empty / size);
+      const col = empty % size;
+      if (row > 0) moves.push(empty - size); // 上
+      if (row < size - 1) moves.push(empty + size); // 下
+      if (col > 0) moves.push(empty - 1); // 左
+      if (col < size - 1) moves.push(empty + 1); // 右
+      return moves;
+    }
+
+    function renderPuzzleBoard() {
+      puzzleBoard.innerHTML = '';
+      puzzleTiles.forEach((val, idx) => {
+        const div = document.createElement('div');
+        div.className = 'puzzle-tile' + (val === null ? ' empty' : '');
+        div.textContent = val !== null ? val : '';
+        if (val !== null) {
+          div.addEventListener('click', () => handleTileClick(idx));
+        }
+        puzzleBoard.appendChild(div);
+      });
+    }
+
+    function handleTileClick(idx) {
+      if (!state.isRunning) return;
+      const valid = getValidMoves(emptyIdx, state.puzzleSize);
+      if (valid.includes(idx)) {
+        // 移動方塊
+        puzzleTiles[emptyIdx] = puzzleTiles[idx];
+        puzzleTiles[idx] = null;
+        emptyIdx = idx;
+        renderPuzzleBoard();
+        checkPuzzleSolved();
+      }
+    }
+
+    function checkPuzzleSolved() {
+      const total = state.puzzleSize * state.puzzleSize;
+      for (let i = 0; i < total - 1; i++) {
+        if (puzzleTiles[i] !== i + 1) return;
+      }
+      // 拼圖解開！
+      onPuzzleSolved();
+    }
+
+    function onPuzzleSolved() {
+      state.solvedCount++;
+      grantShield();
+
+      // 升級下一階段 (3x3 -> 4x4 -> 5x5)
+      const nextSize = state.puzzleSize < 5 ? state.puzzleSize + 1 : 5;
+      initPuzzle(nextSize);
+    }
+
+    function grantShield() {
+      state.hasShield = true;
+      shieldTag.textContent = '🛡️ 名刀: 有效';
+      shieldTag.className = 'shield-tag shield-active';
+    }
+
+    function breakShield() {
+      state.hasShield = false;
+      shieldTag.textContent = '🛡️ 名刀: 無';
+      shieldTag.className = 'shield-tag shield-inactive';
+      state.invincibleUntil = Date.now() + 1500; // 破盾給 1.5 秒免傷
+    }
+
+    function updateTimerUI() {
+      const pct = Math.max(0, (state.puzzleTimeRemaining / state.puzzleTimeMax) * 100);
+      puzzleTimerBar.style.width = pct + '%';
+      timerText.textContent = `剩餘: ${Math.ceil(state.puzzleTimeRemaining)}s`;
+
+      if (pct < 25) {
+        puzzleTimerBar.style.background = '#ef4444';
+      } else if (pct < 50) {
+        puzzleTimerBar.style.background = '#f59e0b';
+      } else {
+        puzzleTimerBar.style.background = 'linear-gradient(90deg, #38bdf8, #818cf8)';
+      }
+    }
+
+    /* ==========================================================================
+       4. 遊戲主循環與時間控制
+       ========================================================================== */
+    let lastFrameTime = performance.now();
+
+    function gameLoop(now) {
+      if (!state.isRunning) return;
+      const dt = (now - lastFrameTime) / 1000;
+      lastFrameTime = now;
+
+      update(dt);
+      render();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+      // 速度隨存活秒數微幅遞增
+      state.speedMultiplier = 1.0 + (state.elapsedSeconds * 0.015);
+      const currentSpeed = 6 * state.speedMultiplier;
+      speedIndicator.textContent = `速度: ${state.speedMultiplier.toFixed(1)}x`;
+
+      // 恐龍狀態更新
+      dino.isDucking = keys.Duck && dino.isGrounded;
+
+      if (keys.Jump && dino.isGrounded && !dino.isDucking) {
+        dino.vy = dino.jumpForce;
+        dino.isGrounded = false;
+      }
+
+      dino.y += dino.vy;
+      dino.vy += dino.gravity;
+
+      if (dino.y >= GROUND_Y) {
+        dino.y = GROUND_Y;
+        dino.vy = 0;
+        dino.isGrounded = true;
+      }
+
+      dino.stepCount++;
+
+      // 障礙物生成
+      const spawnInterval = Math.max(1200, 2400 / state.speedMultiplier);
+      if (Date.now() - lastSpawnTime > spawnInterval) {
+        spawnObstacle();
+        lastSpawnTime = Date.now();
+      }
+
+      // 移動與過濾障礙物
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= currentSpeed;
+
+        // 碰撞檢測
+        const dinoBox = {
+          x: dino.x + 8,
+          y: dino.y,
+          w: dino.isDucking ? 44 : 28,
+          h: dino.isDucking ? 24 : 44
+        };
+
+        const obsBox = {
+          x: obs.x,
+          y: obs.y,
+          w: obs.w,
+          h: obs.h
+        };
+
+        if (checkCollision(dinoBox, obsBox)) {
+          if (Date.now() < state.invincibleUntil) {
+            // 無敵閃爍期，安全穿過
+          } else if (state.hasShield) {
+            // 名刀抵擋一次致命傷！
+            breakShield();
+          } else {
+            // 一命嗚呼
+            triggerGameOver('恐龍撞上障礙物！');
+            return;
+          }
+        }
+
+        if (obs.x + obs.w < 0) {
+          obstacles.splice(i, 1);
+        }
+      }
+
+      // 拼圖時限倒數
+      state.puzzleTimeRemaining -= dt;
+      updateTimerUI();
+      if (state.puzzleTimeRemaining <= 0) {
+        triggerGameOver('拼圖超時！專注力潰散');
+        return;
+      }
+    }
+
+    function spawnObstacle() {
+      const isBird = Math.random() < 0.35 && state.elapsedSeconds > 15;
+      if (isBird) {
+        // 鳥有低飛(需跳)與高飛(需蹲)
+        const flyHigh = Math.random() < 0.5;
+        obstacles.push({
+          type: 'bird',
+          x: canvas.width + 40,
+          y: flyHigh ? GROUND_Y - 32 : GROUND_Y - 14,
+          w: 32,
+          h: 18,
+          flap: 0
+        });
+      } else {
+        // 仙人掌
+        const isDouble = Math.random() < 0.4;
+        obstacles.push({
+          type: 'cactus',
+          x: canvas.width + 20,
+          y: GROUND_Y,
+          w: isDouble ? 34 : 20,
+          h: isDouble ? 42 : 46
+        });
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 地面
+      drawGround(ctx, 6 * state.speedMultiplier);
+
+      // 繪製障礙物
+      obstacles.forEach(obs => {
+        if (obs.type === 'cactus') {
+          drawCactus(ctx, obs.x, obs.y, obs.w, obs.h);
+        } else {
+          obs.flap++;
+          drawBird(ctx, obs.x, obs.y, Math.floor(obs.flap / 10));
+        }
+      });
+
+      // 繪製恐龍
+      const isInvincible = Date.now() < state.invincibleUntil;
+      drawDino(
+        ctx,
+        dino.x,
+        dino.y,
+        dino.isDucking,
+        Math.floor(dino.stepCount / 6),
+        state.hasShield,
+        isInvincible
+      );
+    }
+
+    /* ==========================================================================
+       5. 流程與視窗控制
+       ========================================================================== */
+    function startGame() {
+      state.isRunning = true;
+      state.startTime = Date.now();
+      state.elapsedSeconds = 0;
+      state.hasShield = false;
+      state.solvedCount = 0;
+      state.invincibleUntil = 0;
+      obstacles = [];
+      dino.y = GROUND_Y;
+      dino.vy = 0;
+
+      shieldTag.textContent = '🛡️ 名刀: 無';
+      shieldTag.className = 'shield-tag shield-inactive';
+
+      modalOverlay.classList.add('hidden');
+
+      // 開始時間計時器
+      clearInterval(state.timerInterval);
+      state.timerInterval = setInterval(() => {
+        state.elapsedSeconds++;
+        const mins = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, '0');
+        const secs = String(state.elapsedSeconds % 60).padStart(2, '0');
+        statTime.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+      initPuzzle(3);
+
+      lastFrameTime = performance.now();
+      lastSpawnTime = Date.now();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function triggerGameOver(reason) {
+      state.isRunning = false;
+      clearInterval(state.timerInterval);
+
+      modalTitle.textContent = 'GAME OVER';
+      modalTitle.className = 'overlay-title';
+      modalDesc.textContent = `死因：${reason}`;
+
+      const mins = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, '0');
+      const secs = String(state.elapsedSeconds % 60).padStart(2, '0');
+      finalTime.textContent = `${mins}:${secs}`;
+      finalSolved.textContent = state.solvedCount;
+
+      recordGroup.style.display = 'flex';
+      btnStart.textContent = '再次挑戰';
+      modalOverlay.classList.remove('hidden');
+    }
+
+    btnStart.addEventListener('click', startGame);
+
+    // 初始渲染一次靜態畫面
+    drawGround(ctx, 0);
+    drawDino(ctx, dino.x, dino.y, false, 0, false, false);
+    initPuzzle(3);
+  </script>
+</body>
+</html>
